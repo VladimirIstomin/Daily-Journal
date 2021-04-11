@@ -1,4 +1,5 @@
 const express = require('express');
+const _ = require('lodash');
 
 const app = express();
 
@@ -24,16 +25,26 @@ app.use(express.urlencoded());
 app.use(express.static('public'));
 app.set('view engine', 'ejs');
 
+const posts = [];
+
 app.get('/', (req, res) => {
-    res.render('home', {homeContent: homeContent});
+    res.render('home', {
+        homeContent: homeContent,
+        posts: posts
+    });
+
 });
 
 app.get('/about', (req, res) => {
-    res.render('about', {aboutContent: aboutContent});
+    res.render('about', {
+        aboutContent: aboutContent
+    });
 });
 
 app.get('/contact', (req, res) => {
-    res.render('contact', {contactContent: contactContent});
+    res.render('contact', {
+        contactContent: contactContent
+    });
 });
 
 app.get('/compose', (req, res) => {
@@ -42,11 +53,35 @@ app.get('/compose', (req, res) => {
 
 app.post('/compose', (req, res) => {
     const post = {
-        postTitle: req.body.postTitle,
-        postBody: req.body.postBody,
+        title: req.body.postTitle,
+        content: req.body.postBody,
+        link: _.lowerCase(req.body.postTitle).replaceAll(' ', '-')
     }
 
-    console.log(post);
+    posts.push(post);
+
+    res.redirect('/');
+});
+
+// Posts (routing)
+
+app.get('/posts/:title', (req, res) => {
+    const title = _.lowerCase(req.params.title);
+    let matchedPost;
+    if (posts.some(
+            post => {
+                matchedPost = post;
+                const postTitle = _.lowerCase(post.title);
+                return postTitle === title;
+            }
+        )) {
+
+        res.render('post', {
+            postTitle: matchedPost.title,
+            postContent: matchedPost.content
+        });
+    };
+
 });
 
 app.listen(process.env.PORT || 3000, () => console.log('The application has been started!'));
