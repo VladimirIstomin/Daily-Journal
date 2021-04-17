@@ -1,7 +1,7 @@
 const express = require('express');
-const _ = require('lodash');
+const mongoose = require('mongoose');
 
-const app = express();
+//#region  Basic content
 
 const homeContent = 'Mauris sagittis aliquam tellus, nec imperdiet leo luctus vitae. Integer eget faucibus erat, id luctus ante. \
 Morbi sit amet ex at augue viverra tempus ut sit amet felis. Praesent neque nisl, tristique sit amet tortor in, malesuada pharetra dui. \
@@ -21,18 +21,49 @@ pulvinar orci, ut vulputate ligula magna et mauris. Donec ac accumsan sem. Curab
 venenatis nunc non, blandit posuere elit. Vivamus pharetra diam a lectus sodales, in mollis justo tincidunt. Pellentesque habitant morbi tristique \
 senectus et netus et malesuada fames ac turpis egestas. Maecenas molestie volutpat sagittis.'
 
+//#endregion
+
+//#region Express configuration
+
+const app = express();
 app.use(express.urlencoded());
 app.use(express.static('public'));
 app.set('view engine', 'ejs');
 
-const posts = [];
+//#endregion
+
+//#region DB connection
+
+mongoose.connect('mongodb+srv://vladimiristomin:<password>@general.xpdaq.mongodb.net/General?retryWrites=true&w=majority', {
+    useFindAndModify: false,
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+});
+
+const postSchema = mongoose.Schema(
+    {
+        title: String,
+        content: String
+    }
+);
+
+const Post = mongoose.model('Post', postSchema);
+
+//#endregion
+
+//#region Requests
 
 app.get('/', (req, res) => {
-    res.render('home', {
-        homeContent: homeContent,
-        posts: posts
+    Post.find({}, (err, postsList) => {
+        if (!err) {
+            res.render('home', {
+                homeContent: homeContent,
+                posts: postsList
+            });
+        } else {
+            console.log(err);
+        }
     });
-
 });
 
 app.get('/about', (req, res) => {
@@ -51,37 +82,53 @@ app.get('/compose', (req, res) => {
     res.render('compose');
 });
 
-app.post('/compose', (req, res) => {
-    const post = {
+app.post('/compose', async (req, res) => {
+    const post = new Post({
         title: req.body.postTitle,
-        content: req.body.postBody,
-        link: _.lowerCase(req.body.postTitle).replaceAll(' ', '-')
-    }
+        content: req.body.postBody
+    });
 
-    posts.push(post);
+    // await Post.create(post); // crate is an analogue for insertOne
+
+    await post.save((err, result) => {
+        if (err) {
+            console.log(err);
+        }
+    });
 
     res.redirect('/');
 });
 
-// Posts (routing)
+app.get('/posts/:id', async (req, res) => {
+    const postId = req.params.id;
+    let posts;
 
-app.get('/posts/:title', (req, res) => {
-    const title = _.lowerCase(req.params.title);
-    let matchedPost;
+    await Post.find({}, (err, postsList) => {
+        if (!err) {
+            posts = postsList;
+        } else {
+            console.log(err);
+        }
+    });
+
+    console.log(typeof(postId));
+
     if (posts.some(
-            post => {
-                matchedPost = post;
-                const postTitle = _.lowerCase(post.title);
-                return postTitle === title;
+        post => {
+            if (post._id == postId) { // post._id is an Object, which means, that types should be converted
+                res.render('post', {
+                    postTitle: post.title,
+                    postContent: post.content
+                });
+
+                return true;
             }
-        )) {
 
-        res.render('post', {
-            postTitle: matchedPost.title,
-            postContent: matchedPost.content
-        });
-    };
-
+            return false;
+        }
+    ));
 });
+
+//#endregion
 
 app.listen(process.env.PORT || 3000, () => console.log('The application has been started!'));
